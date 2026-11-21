@@ -1,0 +1,16 @@
+[project]
+name = "shopingcart-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.163.1",
+    "psycopg2-binary>=2.9.13",
+    "psycopg[binary]>=3.3.9",
+    "pytest>=9.2.0",
+    "sqlmodel>=0.0.50",
+]
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
