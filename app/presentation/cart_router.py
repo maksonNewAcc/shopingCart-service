@@ -5,13 +5,16 @@ from sqlmodel import Session
 from app.application.cart_service import ShoppingCartApplicationService
 from app.infrastructure.database import get_session
 from app.infrastructure.postgres_cart_repo import PostgresShoppingCartRepository
+from app.infrastructure.postgres_product_catalog import PostgresProductCatalog
 from app.presentation.contracts import AddCartItemRequest, CreateCartRequest
 
 router = APIRouter(prefix="/api/carts", tags=["ShoppingCart"])
 
 
 def get_cart_service(session: Session = Depends(get_session)) -> ShoppingCartApplicationService:
-    return ShoppingCartApplicationService(PostgresShoppingCartRepository(session))
+    return ShoppingCartApplicationService(
+        PostgresShoppingCartRepository(session), PostgresProductCatalog(session)
+    )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -43,9 +46,7 @@ def add_item_to_cart(
     dto = service.add_item_to_cart(
         cart_id=cart_id,
         product_id=payload.product_id,
-        unit_price=payload.unit_price,
         quantity=payload.quantity,
-        currency=payload.currency,
     )
     return asdict(dto)
 

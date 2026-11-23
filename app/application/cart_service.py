@@ -1,15 +1,19 @@
-from decimal import Decimal
 from uuid import UUID
 from app.application.dtos import CartItemDto, ShoppingCartSummaryDto
+from app.application.product_catalog import ProductCatalog
 from app.application.repositories import ShoppingCartRepository
 from app.domain.aggregates import ShoppingCart
-from app.domain.exceptions import CartNotFoundException, EmptyCartCheckoutException
-from app.domain.value_objects import CartId, CustomerId, Money, ProductId, Quantity
+from app.domain.exceptions import (
+    CartNotFoundException,
+    ProductNotFoundException,
+)
+from app.domain.value_objects import CartId, CustomerId, ProductId, Quantity
 
 
 class ShoppingCartApplicationService:
-    def __init__(self, repository: ShoppingCartRepository) -> None:
+    def __init__(self, repository: ShoppingCartRepository, catalog: ProductCatalog) -> None:
         self._repository = repository
+        self._catalog = catalog
 
     def create_cart(self, customer_id: UUID) -> ShoppingCartSummaryDto:
         cart = ShoppingCart.create(CustomerId(customer_id))
@@ -24,14 +28,15 @@ class ShoppingCartApplicationService:
         self,
         cart_id: UUID,
         product_id: UUID,
-        unit_price: Decimal,
         quantity: int,
-        currency: str = "PLN",
     ) -> ShoppingCartSummaryDto:
         cart = self._get_existing_cart(cart_id)
+        unit_price = self._catalog.get_unit_price(ProductId(product_id))
+        if unit_price is None:
+            raise ProductNotFoundException(product_id)
         cart.add_item_to_cart(
             product_id=ProductId(product_id),
-            unit_price=Money(unit_price, currency),
+            unit_price=unit_price,
             quantity=Quantity(quantity),
         )
         self._repository.save(cart)
@@ -57,14 +62,7 @@ class ShoppingCartApplicationService:
 
     @staticmethod
     def _to_dto(cart: ShoppingCart) -> ShoppingCartSummaryDto:
-        try:
-            total = cart.calculate_total()
-            total_amount = total.amount
-            currency = total.currency
-        except EmptyCartCheckoutException:
-            total_amount = Decimal("0.00")
-            currency = "PLN"
-
+        total = cart.calculate_total()
         return ShoppingCartSummaryDto(
             cart_id=cart.id.value,
             customer_id=cart.customer_id.value,
@@ -78,6 +76,6 @@ class ShoppingCartApplicationService:
                 )
                 for i in cart.items
             ),
-            order_total=total_amount,
-            currency=currency,
+            order_total=total.amount,
+            currency=total.currency,
         )

@@ -24,8 +24,18 @@ class CartItemRemoved(DomainEvent):
 
 
 @dataclass(frozen=True)
+class CheckoutLine:
+    product_id: UUID
+    quantity: int
+    unit_price: Decimal
+
+
+@dataclass(frozen=True)
 class CheckoutInitiated(DomainEvent):
+    """Hand-off to Payment and Order (Order.source_cart_id, OrderLine per line)."""
+
     cart_id: UUID
     customer_id: UUID
+    items: tuple[CheckoutLine, ...]
     total_amount: Decimal
     currency: str

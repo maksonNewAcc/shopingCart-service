@@ -15,10 +15,11 @@ class AuditBase(SQLModel):
 
 
 class Product(AuditBase, table=True):
+    """Read-only Product Catalog projection. Written by the catalog owner, never by this service."""
+
     name: str
     description: Optional[str] = None
-    price: float
-    stock: int = 0
+    price: Decimal = Field(max_digits=12, decimal_places=2)
 
 
 class ShoppingCartTable(AuditBase, table=True):

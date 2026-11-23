@@ -7,14 +7,18 @@ import pytest
 
 from app.application.cart_service import ShoppingCartApplicationService
 from app.domain.aggregates import ShoppingCart
-from app.domain.exceptions import CartNotFoundException, EmptyCartCheckoutException
+from app.domain.exceptions import (
+    CartNotFoundException,
+    EmptyCartCheckoutException,
+    ProductNotFoundException,
+)
 from app.domain.value_objects import CustomerId, Money, ProductId, Quantity
 
 
 def test_create_cart_when_valid_customer_id_creates_and_saves_cart():
     # Arrange
     repo = MagicMock()
-    sut = ShoppingCartApplicationService(repo)
+    sut = ShoppingCartApplicationService(repo, MagicMock())
     customer_id = uuid4()
 
     # Act
@@ -27,25 +31,44 @@ def test_create_cart_when_valid_customer_id_creates_and_saves_cart():
     repo.save.assert_called_once()
 
 
-def test_add_item_when_cart_exists_updates_cart_and_calls_save():
+def test_add_item_when_cart_exists_uses_catalog_price_and_calls_save():
     # Arrange
     existing_cart = ShoppingCart.create(CustomerId(uuid4()))
+    product_id = uuid4()
     repo = MagicMock()
     repo.get_by_id.return_value = existing_cart
-    sut = ShoppingCartApplicationService(repo)
+    catalog = MagicMock()
+    catalog.get_unit_price.return_value = Money(Decimal("350.00"), "PLN")
+    sut = ShoppingCartApplicationService(repo, catalog)
 
     # Act
-    result = sut.add_item_to_cart(
-        cart_id=existing_cart.id.value,
-        product_id=uuid4(),
-        unit_price=Decimal("350.00"),
-        quantity=2,
-    )
+    result = sut.add_item_to_cart(cart_id=existing_cart.id.value, product_id=product_id, quantity=2)
 
     # Assert
+    catalog.get_unit_price.assert_called_once_with(ProductId(product_id))
     assert len(result.items) == 1
+    assert result.items[0].unit_price == Decimal("350.00")
     assert result.order_total == Decimal("700.00")
     repo.save.assert_called_once_with(existing_cart)
+
+
+def test_add_item_when_product_not_in_catalog_throws_not_found_and_never_saves():
+    # Arrange
+    existing_cart = ShoppingCart.create(CustomerId(uuid4()))
+    missing_product_id = uuid4()
+    repo = MagicMock()
+    repo.get_by_id.return_value = existing_cart
+    catalog = MagicMock()
+    catalog.get_unit_price.return_value = None
+    sut = ShoppingCartApplicationService(repo, catalog)
+
+    # Act & Assert
+    with pytest.raises(ProductNotFoundException) as exc_info:
+        sut.add_item_to_cart(cart_id=existing_cart.id.value, product_id=missing_product_id, quantity=1)
+
+    assert exc_info.value.code == "cart.product_not_found"
+    assert exc_info.value.product_id == missing_product_id
+    repo.save.assert_not_called()
 
 
 def test_initiate_checkout_when_cart_does_not_exist_throws_not_found_and_never_saves():
@@ -53,7 +76,7 @@ def test_initiate_checkout_when_cart_does_not_exist_throws_not_found_and_never_s
     missing_cart_id = uuid4()
     repo = MagicMock()
     repo.get_by_id.return_value = None
-    sut = ShoppingCartApplicationService(repo)
+    sut = ShoppingCartApplicationService(repo, MagicMock())
 
     # Act & Assert
     with pytest.raises(CartNotFoundException) as exc_info:
@@ -69,7 +92,7 @@ def test_initiate_checkout_when_domain_rule_violated_propagates_and_never_saves(
     empty_cart = ShoppingCart.create(CustomerId(uuid4()))
     repo = MagicMock()
     repo.get_by_id.return_value = empty_cart
-    sut = ShoppingCartApplicationService(repo)
+    sut = ShoppingCartApplicationService(repo, MagicMock())
 
     # Act & Assert
     with pytest.raises(EmptyCartCheckoutException) as exc_info:
@@ -87,7 +110,7 @@ def test_remove_item_when_cart_exists_removes_product_and_saves():
 
     repo = MagicMock()
     repo.get_by_id.return_value = existing_cart
-    sut = ShoppingCartApplicationService(repo)
+    sut = ShoppingCartApplicationService(repo, MagicMock())
 
     # Act
     result = sut.remove_item_from_cart(existing_cart.id.value, product_id)

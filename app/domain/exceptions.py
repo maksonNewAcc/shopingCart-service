@@ -12,19 +12,56 @@ class DomainException(Exception, ABC):
         super().__init__(message)
 
 
+# --- Value objects ---------------------------------------------------------
+
+
 @final
-class InvalidQuantityException(DomainException):
-    def __init__(self, attempted_quantity: int) -> None:
-        self.attempted_quantity = attempted_quantity
+class InvalidMoneyException(DomainException):
+    def __init__(self, attempted_amount: object) -> None:
+        self.attempted_amount = attempted_amount
         super().__init__(
-            code="cart.invalid_quantity",
-            message=f"Item quantity must be between 1 and 99, but was {attempted_quantity}.",
+            code="money.invalid_amount",
+            message=f"Money amount must be a finite, non-negative Decimal, but was {attempted_amount!r}.",
         )
 
 
 @final
+class InvalidCurrencyException(DomainException):
+    def __init__(self, attempted_currency: object) -> None:
+        self.attempted_currency = attempted_currency
+        super().__init__(
+            code="money.invalid_currency",
+            message=f"Currency must be a 3-letter ISO 4217 code, but was {attempted_currency!r}.",
+        )
+
+
+@final
+class CurrencyMismatchException(DomainException):
+    def __init__(self, expected_currency: str, actual_currency: str) -> None:
+        self.expected_currency = expected_currency
+        self.actual_currency = actual_currency
+        super().__init__(
+            code="money.currency_mismatch",
+            message=f"Cannot combine {expected_currency} with {actual_currency}.",
+        )
+
+
+@final
+class InvalidQuantityException(DomainException):
+    def __init__(self, attempted_quantity: object) -> None:
+        self.attempted_quantity = attempted_quantity
+        super().__init__(
+            code="cart.invalid_quantity",
+            message=f"Item quantity must be an integer between 1 and 99, but was {attempted_quantity!r}.",
+        )
+
+
+# --- ShoppingCart aggregate ------------------------------------------------
+
+
+@final
 class InvalidPriceException(DomainException):
-    def __init__(self, attempted_price: Decimal, currency: str = "PLN") -> None:
+    def __init__(self, attempted_price: Decimal, currency: str) -> None:
         self.attempted_price = attempted_price
         self.currency = currency
         super().__init__(
@@ -71,4 +108,14 @@ class CartNotFoundException(DomainException):
         super().__init__(
             code="cart.not_found",
             message=f"ShoppingCart {cart_id} was not found.",
+        )
+
+
+@final
+class ProductNotFoundException(DomainException):
+    def __init__(self, product_id: UUID) -> None:
+        self.product_id = product_id
+        super().__init__(
+            code="cart.product_not_found",
+            message=f"Product {product_id} was not found in the product catalog.",
         )

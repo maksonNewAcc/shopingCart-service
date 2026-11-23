@@ -1,6 +1,5 @@
-from decimal import Decimal
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictInt
 
 
 class CreateCartRequest(BaseModel):
@@ -9,6 +8,4 @@ class CreateCartRequest(BaseModel):
 
 class AddCartItemRequest(BaseModel):
     product_id: UUID
-    unit_price: Decimal
-    quantity: int
-    currency: str = "PLN"
+    quantity: StrictInt  # rejects true/false and "2"; range is checked by Quantity
